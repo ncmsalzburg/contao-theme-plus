@@ -720,7 +720,7 @@ class LayoutAdditionalSources extends Frontend
 			// use reduced files
 			else
 			{
-				$arrArrAdditionalSources = $this->getSources($arrLayoutAdditionalSources);
+				$arrArrAdditionalSources = $this->getSources($arrLayoutAdditionalSources, false, false);
 				foreach ($arrArrAdditionalSources as $strType => $arrAdditionalSources)
 				{
 					foreach ($arrAdditionalSources as $arrAdditionalSource)
@@ -734,7 +734,7 @@ class LayoutAdditionalSources extends Frontend
 							}
 							else
 							{
-								$objFile = new File($strSource);
+								$objFile = new File($arrAdditionalSource['src']);
 								$strContent = "\n" . $objFile->getContent() . "\n";
 								if (!strlen($strCc))
 								{
@@ -751,7 +751,7 @@ class LayoutAdditionalSources extends Frontend
 							}
 							else
 							{
-								$objFile = new File($strSource);
+								$objFile = new File($arrAdditionalSource['src']);
 								$strContent = "\n" . $objFile->getContent() . "\n";
 								if (!strlen($strCc))
 								{
