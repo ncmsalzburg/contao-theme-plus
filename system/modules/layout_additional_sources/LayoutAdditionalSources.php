@@ -205,6 +205,13 @@ class LayoutAdditionalSources extends Frontend
 			'js' => array('-' => array())
 		);
 		
+		// remap css and js files from $arrSourcesMap to $arrSources, combine files if possible
+		$arrSources = array
+		(
+			'css' => array(),
+			'js' => array()
+		);
+		
 		// collect css and js files into $arrSourcesMap, depending of the conditional comment
 		$objAdditionalSources = $this->Database->execute("
 				SELECT
@@ -222,13 +229,31 @@ class LayoutAdditionalSources extends Frontend
 			$strSource = $objAdditionalSources->$strType;
 			switch ($strType)
 			{
-			case 'css_file':
 			case 'css_url':
+				if ($GLOBALS['TL_CONFIG']['additional_sources_combination'] != 'combine_all')
+				{
+					$arrSources['css'][] = array
+					(
+						'src' => $strSource,
+						'cc' => $strCc != '-' ? $strCc : ''
+					);
+					continue;
+				}
+			case 'css_file':
 				$strGroup = 'css';
 				break;
 			
-			case 'js_file':
 			case 'js_url':
+				if ($GLOBALS['TL_CONFIG']['additional_sources_combination'] != 'combine_all')
+				{
+					$arrSources['js'][] = array
+					(
+						'src' => $strSource,
+						'cc' => $strCc != '-' ? $strCc : ''
+					);
+					continue;
+				}
+			case 'js_file':
 				$strGroup = 'js';
 				break;
 			
@@ -243,192 +268,191 @@ class LayoutAdditionalSources extends Frontend
 			$arrSourcesMap[$strGroup][$strCc][] = $objAdditionalSources->row();
 		}
 		
-		// remap css and js files from $arrSourcesMap to $arrSources, combine files if possible
-		$arrSources = array
-		(
-			'css' => array(),
-			'js' => array()
-		);
-		
 		// handle css files
 		foreach ($arrSourcesMap['css'] as $strCc => $arrCssSources)
 		{
-			$strFile = $this->calculateTempFile('css', $strCc, $arrCssSources);
-			$strFileGz = preg_replace('#\.(js|css)$#', '.gz.$1', $strFile);
-			if (!file_exists(TL_ROOT . '/' . $strFile))
+			if (count($arrCssSources))
 			{
-				$strCss = '';
-				foreach ($arrCssSources as $arrSource)
+				$strFile = $this->calculateTempFile('css', $strCc, $arrCssSources);
+				$strFileGz = preg_replace('#\.(js|css)$#', '.gz.$1', $strFile);
+				if (!file_exists(TL_ROOT . '/' . $strFile))
 				{
-					switch ($arrSource['type'])
+					$strCss = '';
+					foreach ($arrCssSources as $arrSource)
 					{
-					case 'css_file':
-						$objFile = new File($arrSource['css_file']);
-						$strContent = $objFile->getContent();
-						
-						// handle @charset
-						if (preg_match('#\@charset\s+[\'"]([\w\-]+)[\'"]\;#Ui', $strContent, $arrMatch))
+						switch ($arrSource['type'])
 						{
-							// convert character encoding to utf-8
-							if (strtoupper($arrMatch[1]) != 'UTF-8')
+						case 'css_file':
+							$objFile = new File($arrSource['css_file']);
+							$strContent = $objFile->getContent();
+							
+							// handle @charset
+							if (preg_match('#\@charset\s+[\'"]([\w\-]+)[\'"]\;#Ui', $strContent, $arrMatch))
 							{
-								$strContent = iconv(strtoupper($arrMatch[1]), 'UTF-8', $strContent);
+								// convert character encoding to utf-8
+								if (strtoupper($arrMatch[1]) != 'UTF-8')
+								{
+									$strContent = iconv(strtoupper($arrMatch[1]), 'UTF-8', $strContent);
+								}
+								// remove @charset tag
+								$strContent = str_replace($arrMatch[0], '', $strContent);
 							}
-							// remove @charset tag
-							$strContent = str_replace($arrMatch[0], '', $strContent);
-						}
-						
-						// remap url(..) entries
-						if ($blnAbsolutizeUrls)
-						{
-							$strRemappingPath = dirname($arrSource['css_file']);
-						}
-						else
-						{
-							$strRemappingPath = $this->calculateRemappingPath($arrSource['css_file'], $strFile);
-						}
-						$objUrlRemapper = new UrlRemapper($strRemappingPath, $blnAbsolutizeUrls, $objAbsolutizePage);
-						$strContent = preg_replace_callback('#url\((.*)\)#U', array(&$objUrlRemapper, 'replace'), $strContent);
-					
-						// add media definition
-						$arrMedia = deserialize($arrSource['media'], true);
-						if (count($arrMedia))
-						{
-							$strContent = sprintf('@media %s{%s}', implode(',', $arrMedia), $strContent);
-						}
-						
-						$strCss .= trim($strContent) . "\n";
-						break;
-					
-					case 'css_url':
-						if ($arrSource['css_url_real_path'])
-						{
-							$strContent = file_get_contents($arrSource['css_url_real_path']);
-						}
-						else
-						{
-							$strContent = file_get_contents($this->DomainLink->absolutizeUrl($arrSource['css_url'])) . "\n";
-						}
-						
-						// handle @charset
-						if (preg_match('#\@charset\s+[\'"]([\w\-]+)[\'"]\;#Ui', $strContent, $arrMatch))
-						{
-							// convert character encoding to utf-8
-							if (strtoupper($arrMatch[1]) != 'UTF-8')
+							
+							// remap url(..) entries
+							if ($blnAbsolutizeUrls)
 							{
-								$strContent = iconv(strtoupper($arrMatch[1]), 'UTF-8', $strContent);
+								$strRemappingPath = dirname($arrSource['css_file']);
 							}
-							// remove @charset tag
-							$strContent = str_replace($arrMatch[0], '', $strContent);
-						}
+							else
+							{
+								$strRemappingPath = $this->calculateRemappingPath($arrSource['css_file'], $strFile);
+							}
+							$objUrlRemapper = new UrlRemapper($strRemappingPath, $blnAbsolutizeUrls, $objAbsolutizePage);
+							$strContent = preg_replace_callback('#url\((.*)\)#U', array(&$objUrlRemapper, 'replace'), $strContent);
 						
-						$strCss .= trim($strContent) . "\n";
-						break;
+							// add media definition
+							$arrMedia = deserialize($arrSource['media'], true);
+							if (count($arrMedia))
+							{
+								$strContent = sprintf('@media %s{%s}', implode(',', $arrMedia), $strContent);
+							}
+							
+							$strCss .= trim($strContent) . "\n";
+							break;
+						
+						case 'css_url':
+							if ($arrSource['css_url_real_path'])
+							{
+								$strContent = file_get_contents($arrSource['css_url_real_path']);
+							}
+							else
+							{
+								$strContent = file_get_contents($this->DomainLink->absolutizeUrl($arrSource['css_url'])) . "\n";
+							}
+							
+							// handle @charset
+							if (preg_match('#\@charset\s+[\'"]([\w\-]+)[\'"]\;#Ui', $strContent, $arrMatch))
+							{
+								// convert character encoding to utf-8
+								if (strtoupper($arrMatch[1]) != 'UTF-8')
+								{
+									$strContent = iconv(strtoupper($arrMatch[1]), 'UTF-8', $strContent);
+								}
+								// remove @charset tag
+								$strContent = str_replace($arrMatch[0], '', $strContent);
+							}
+							
+							$strCss .= trim($strContent) . "\n";
+							break;
+						}
+					}
+					
+					// add charset definition
+					if ($blnAddCharset)
+					{
+						$strCss = '@charset "UTF-8";' . "\n" . $strCss;
+					}
+					
+					// minify
+					if (!$GLOBALS['TL_CONFIG']['yui_compression_disabled'])
+					{
+						$strCss = $this->compressYui($strCss, 'css');
+					}
+					
+					// store the temporary file
+					file_put_contents(TL_ROOT . '/' . $strFile, $strCss);
+					
+					// always create the gzip compressed version
+					if (!$GLOBALS['TL_CONFIG']['gz_compression_disabled'])
+					{
+						$this->compressFileGzip($strFile, $strFileGz);
 					}
 				}
-		
-				// add charset definition
-				if ($blnAddCharset)
+				
+				if ($blnAcceptGzip && $blnAllowGzip)
 				{
-					$strCss = '@charset "UTF-8";' . "\n" . $strCss;
+					$strFile = $strFileGz;
 				}
 				
-				// minify
-				if (!$GLOBALS['TL_CONFIG']['yui_compression_disabled'])
+				if (!isset($arrSources['css']))
 				{
-					$strCss = $this->compressYui($strCss, 'css');
+					$arrSources['css'] = array();
 				}
-				
-				// store the temporary file
-				file_put_contents(TL_ROOT . '/' . $strFile, $strCss);
-				
-				// always create the gzip compressed version
-				if (!$GLOBALS['TL_CONFIG']['gz_compression_disabled'])
-				{
-					$this->compressFileGzip($strFile, $strFileGz);
-				}
+				$arrSources['css'][] = array
+				(
+					'src' => $strFile,
+					'cc' => $strCc != '-' ? $strCc : ''
+				);
 			}
-			
-			if ($blnAcceptGzip && $blnAllowGzip)
-			{
-				$strFile = $strFileGz;
-			}
-			
-			if (!isset($arrSources['css']))
-			{
-				$arrSources['css'] = array();
-			}
-			$arrSources['css'][] = array
-			(
-				'src' => $strFile,
-				'cc' => $strCc != '-' ? $strCc : ''
-			);
 		}
 		
 		// handle js file
 		foreach ($arrSourcesMap['js'] as $strCc => $arrJsSources)
 		{	
-			$strFile = $this->calculateTempFile('js', $strCc, $arrSourcesMap['js'][$strCc]);
-			$strFileGz = preg_replace('#\.(js|css)$#', '.gz.$1', $strFile);
-			if (!file_exists(TL_ROOT . '/' . $strFile))
+			if (count($arrJsSources))
 			{
-				$strJs = '';
-				foreach ($arrJsSources as $arrSource)
+				$strFile = $this->calculateTempFile('js', $strCc, $arrSourcesMap['js'][$strCc]);
+				$strFileGz = preg_replace('#\.(js|css)$#', '.gz.$1', $strFile);
+				if (!file_exists(TL_ROOT . '/' . $strFile))
 				{
-					switch ($arrSource['type'])
+					$strJs = '';
+					foreach ($arrJsSources as $arrSource)
 					{
-					case 'js_file':
-						$objFile = new File($arrSource['js_file']);
-						$strContent = $objFile->getContent();
+						switch ($arrSource['type'])
+						{
+						case 'js_file':
+							$objFile = new File($arrSource['js_file']);
+							$strContent = $objFile->getContent();
+							
+							$strJs .= $strContent . "\n";
+							break;
 						
-						$strJs .= $strContent . "\n";
-						break;
+						case 'js_url':
+							if ($arrSource['js_url_real_path'])
+							{
+								$strContent = file_get_contents($arrSource['js_url_real_path']);
+							}
+							else
+							{
+								$strContent = file_get_contents($this->DomainLink->absolutizeUrl($arrSource['js_url']));
+							}
+													
+							$strJs .= $strContent . "\n";
+							break;
+						}
+					}
 					
-					case 'js_url':
-						if ($arrSource['js_url_real_path'])
-						{
-							$strContent = file_get_contents($arrSource['js_url_real_path']);
-						}
-						else
-						{
-							$strContent = file_get_contents($this->DomainLink->absolutizeUrl($arrSource['js_url']));
-						}
-												
-						$strJs .= $strContent . "\n";
-						break;
+					// minify
+					if (!$GLOBALS['TL_CONFIG']['yui_compression_disabled'])
+					{
+						$strJs = $this->compressYui($strJs, 'js');
+					}
+					
+					// store the temporary file
+					file_put_contents(TL_ROOT . '/' . $strFile, $strJs);
+					
+					// always create the gzip compressed version
+					if (!$GLOBALS['TL_CONFIG']['gz_compression_disabled'])
+					{
+						$this->compressFileGzip($strFile, $strFileGz);
 					}
 				}
 				
-				// minify
-				if (!$GLOBALS['TL_CONFIG']['yui_compression_disabled'])
+				if ($blnAcceptGzip && $blnAllowGzip)
 				{
-					$strJs = $this->compressYui($strJs, 'js');
+					$strFile = $strFileGz;
 				}
 				
-				// store the temporary file
-				file_put_contents(TL_ROOT . '/' . $strFile, $strJs);
-				
-				// always create the gzip compressed version
-				if (!$GLOBALS['TL_CONFIG']['gz_compression_disabled'])
+				if (!isset($arrSources['js']))
 				{
-					$this->compressFileGzip($strFile, $strFileGz);
+					$arrSources['js'] = array();
 				}
+				$arrSources['js'][] = array
+				(
+					'src' => $strFile,
+					'cc' => $strCc != '-' ? $strCc : ''
+				);
 			}
-			
-			if ($blnAcceptGzip && $blnAllowGzip)
-			{
-				$strFile = $strFileGz;
-			}
-			
-			if (!isset($arrSources['js']))
-			{
-				$arrSources['js'] = array();
-			}
-			$arrSources['js'][] = array
-			(
-				'src' => $strFile,
-				'cc' => $strCc != '-' ? $strCc : ''
-			);
 		}
 		
 		return $arrSources;
@@ -479,7 +503,42 @@ class LayoutAdditionalSources extends Frontend
 	public function generatePage(Database_Result $objPage, Database_Result $objLayout, PageRegular $objPageRegular)
 	{
 		$arrLayoutAdditionalSources = deserialize($objLayout->additional_source, true);
-		
+		$arrHtml = $this->generateHtml($arrLayoutAdditionalSources);
+		foreach ($arrHtml as $strHtml)
+		{
+			$GLOBALS['TL_HEAD'][] = $strHtml;
+		}
+	}
+	
+	
+	/**
+	 * Hook
+	 * 
+	 * @param string $strTag
+	 * @return mixed
+	 */
+	public function hookReplaceInsertTags($strTag)
+	{
+		$arrParts = explode('::', $strTag);
+		switch ($arrParts[0])
+		{
+		case 'additional_sources':
+			return implode("\n", $this->generateHtml(explode(',', $arrParts[1]))) . "\n";
+		}
+		 
+		return false;
+	}
+	
+	
+	/**
+	 * Generate the html code.
+	 * 
+	 * @param array $arrLayoutAdditionalSources
+	 * @return array
+	 */
+	protected function generateHtml($arrLayoutAdditionalSources)
+	{
+		$arrResult = array();
 		if (count($arrLayoutAdditionalSources))
 		{
 			// check if a BE user is logged in
@@ -527,7 +586,7 @@ class LayoutAdditionalSources extends Frontend
 					}
 				
 					// add the html to the layout head
-					$GLOBALS['TL_HEAD'][] = $strAdditionalSource;
+					$arrResult[] = $strAdditionalSource;
 				}
 			}
 			
@@ -557,11 +616,12 @@ class LayoutAdditionalSources extends Frontend
 						}
 					
 						// add the html to the layout head
-						$GLOBALS['TL_HEAD'][] = $strAdditionalSource;
+						$arrResult[] = $strAdditionalSource;
 					}
 				}
 			}
 		}
+		return $arrResult;
 	}
 }
 
