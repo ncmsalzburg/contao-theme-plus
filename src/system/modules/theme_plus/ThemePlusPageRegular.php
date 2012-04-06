@@ -373,7 +373,7 @@ class ThemePlusPageRegular extends PageRegular
 				// split path/url and cc
 				if (is_string($javascript))
 				{
-					list($javascript, $cc) = explode('|', $javascript);
+					list($javascript, $cc, $static) = explode('|', $javascript);
 
 					// strip the static urls
 					$javascript = $this->stripStaticURL($javascript);
@@ -381,7 +381,17 @@ class ThemePlusPageRegular extends PageRegular
 				else
 				{
 					$cc = '';
+					$static = '';
 				}
+
+				// if $cc contains 'static', switch $cc and $static contents
+				if ($cc == 'static') {
+					$tmp = $static;
+					$static = $cc;
+					$cc = $tmp;
+				}
+
+				// $static is not supported in this version!!!
 
 				// add unmodified if its a ThemePlusFile object
 				if ($javascript instanceof ThemePlusFile)
