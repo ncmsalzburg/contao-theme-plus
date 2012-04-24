@@ -5,7 +5,7 @@
 
 $GLOBALS['TL_DCA']['tl_layout']['palettes']['default'] = str_replace(
 	'stylesheet',
-	'theme_plus_exclude_contaocss,' . (version_compare(VERSION, '2.11', '<') ? 'theme_plus_exclude_frameworkcss,' : '') . 'stylesheet,theme_plus_files,theme_plus_exclude_files',
+	(version_compare(VERSION, '2.11', '<') ? 'theme_plus_exclude_contaocss,' : '') . 'theme_plus_exclude_frameworkcss,' . 'stylesheet,theme_plus_files,theme_plus_exclude_files',
 	$GLOBALS['TL_DCA']['tl_layout']['palettes']['default']);
 
 $GLOBALS['TL_DCA']['tl_layout']['fields']['theme_plus_exclude_contaocss'] = array
@@ -107,4 +107,3 @@ class tl_layout_theme_plus extends Backend
 		return $arrFile;
 	}
 }
-?>

@@ -455,14 +455,14 @@ class ThemePlusRunonce extends Frontend
 	protected function upgrade2_2()
 	{
 		if (version_compare(VERSION, '2.11', '>=') &&
-			$this->Database->fieldExists('theme_plus_exclude_frameworkcss', 'tl_layout') &&
+			$this->Database->fieldExists('theme_plus_exclude_contaocss', 'tl_layout') &&
 			$this->Database->fieldExists('skipFramework', 'tl_layout')) {
 			// set skipFramework if theme_plus_exclude_frameworkcss was enabled
 			$this->Database
-				->query('UPDATE tl_layout SET skipFramework=\'1\' WHERE theme_plus_exclude_frameworkcss=\'1\'');
+				->query('UPDATE tl_layout SET skipFramework=\'1\' WHERE theme_plus_exclude_contaocss=\'1\'');
 			// disable theme_plus_exclude_frameworkcss to prevent overwrite of skipFramework next time
 			$this->Database
-				->query('UPDATE tl_layout SET theme_plus_exclude_frameworkcss=\'\' WHERE theme_plus_exclude_frameworkcss=\'1\'');
+				->query('UPDATE tl_layout SET theme_plus_exclude_contaocss=\'\' WHERE theme_plus_exclude_contaocss=\'1\'');
 		}
 	}
 
