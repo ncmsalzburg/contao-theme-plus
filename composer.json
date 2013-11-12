@@ -33,7 +33,7 @@
 		"bit3/php-coding-standard":"@dev"
 	},
 	"replace": {
-		"contao-legacy/theme_plus": "*"
+		"contao-legacy/theme_plus": "self.version"
 	},
 	"autoload":{
 		"psr-0": {
